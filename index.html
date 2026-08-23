@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body { margin: 0; padding: 0; background: #000; }
+    #player { width: 100%; height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+
+  <script src="https://www.youtube.com/iframe_api"></script>
+  <script>
+    var player;
+    var videoId = 'jNQXAC9IVRw'; // هيتغير من فلاتر لو محتاج
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player('player', {
+        videoId: videoId,
+        playerVars: {
+          'playsinline': 1,
+          'controls': 1,
+          'fs': 0
+        },
+        events: {
+          'onReady': onPlayerReady,
+          'onStateChange': onPlayerStateChange,
+          'onError': onPlayerError
+        }
+      });
+    }
+
+    function onPlayerReady(event) {
+      sendToFlutter({type: 'ready'});
+    }
+
+    function onPlayerStateChange(event) {
+      sendToFlutter({type: 'stateChange', state: event.data});
+    }
+
+    function onPlayerError(event) {
+      sendToFlutter({type: 'error', code: event.data});
+    }
+
+    function sendToFlutter(data) {
+      if (window.FlutterChannel) {
+        window.FlutterChannel.postMessage(JSON.stringify(data));
+      }
+    }
+
+    // الدوال اللي فلاتر هيناديها
+    function flutterPlay() { player.playVideo(); }
+    function flutterPause() { player.pauseVideo(); }
+    function flutterSeekTo(seconds) { player.seekTo(seconds, true); }
+    function flutterGetState() {
+      sendToFlutter({
+        type: 'currentState',
+        state: player.getPlayerState(),
+        position: player.getCurrentTime()
+      });
+    }
+  </script>
+</body>
+</html>
