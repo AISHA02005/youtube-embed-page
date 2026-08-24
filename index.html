@@ -13,15 +13,16 @@
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
     var player;
-    var videoId = 'jNQXAC9IVRw'; // هيتغير من فلاتر لو محتاج
+    var isPlayerReady = false;
 
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
-        videoId: videoId,
+        videoId: 'jNQXAC9IVRw',
         playerVars: {
           'playsinline': 1,
-          'controls': 1,
-          'fs': 0
+          'controls': 0,
+          'fs': 0,
+          'disablekb': 1
         },
         events: {
           'onReady': onPlayerReady,
@@ -32,6 +33,7 @@
     }
 
     function onPlayerReady(event) {
+      isPlayerReady = true;
       sendToFlutter({type: 'ready'});
     }
 
@@ -49,11 +51,14 @@
       }
     }
 
-    // الدوال اللي فلاتر هيناديها
-    function flutterPlay() { player.playVideo(); }
-    function flutterPause() { player.pauseVideo(); }
-    function flutterSeekTo(seconds) { player.seekTo(seconds, true); }
+    function flutterPlay() { if (isPlayerReady) player.playVideo(); }
+    function flutterPause() { if (isPlayerReady) player.pauseVideo(); }
+    function flutterSeekTo(seconds) { if (isPlayerReady) player.seekTo(seconds, true); }
+    function flutterLoadVideo(videoId) {
+      if (isPlayerReady) player.cueVideoById(videoId);
+    }
     function flutterGetState() {
+      if (!isPlayerReady) return;
       sendToFlutter({
         type: 'currentState',
         state: player.getPlayerState(),
