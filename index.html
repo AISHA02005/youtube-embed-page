@@ -11,6 +11,14 @@
   <div id="player"></div>
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+      sendToFlutter({
+        type: 'jsError',
+        message: message,
+        lineno: lineno
+      });
+    };
+
     var player;
     var isPlayerReady = false;
     function onYouTubeIframeAPIReady() {
