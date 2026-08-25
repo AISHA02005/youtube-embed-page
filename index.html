@@ -21,6 +21,12 @@
 
     var player;
     var isPlayerReady = false;
+
+    // بنخزن هنا أي طلب مزامنة لسه مطبقناهوش، لحد ما الفيديو يبقى جاهز
+    // فعليًا يستقبل أمر seekTo (مش مجرد لحظة استدعاء loadVideoById)
+    var pendingStartSeconds = null;
+    var pendingShouldPlay = null;
+
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
         playerVars: {
@@ -42,6 +48,23 @@
     }
     function onPlayerStateChange(event) {
       sendToFlutter({type: 'stateChange', state: event.data});
+
+      // event.data: 1 = playing, 3 = buffering
+      // دي أول لحظة نضمن فيها إن الفيديو استقبل الـMetadata بتاعه فعليًا
+      // وبقى جاهز يستجيب لأمر seekTo بدقة، فبنطبق المزامنة المعلّقة هنا
+      if (pendingStartSeconds !== null &&
+          (event.data === 1 || event.data === 3)) {
+        player.seekTo(pendingStartSeconds, true);
+
+        if (!pendingShouldPlay) {
+          setTimeout(function() {
+            player.pauseVideo();
+          }, 300);
+        }
+
+        pendingStartSeconds = null;
+        pendingShouldPlay = null;
+      }
     }
     function onPlayerError(event) {
       sendToFlutter({type: 'error', code: event.data});
@@ -59,15 +82,16 @@
     }
     function flutterLoadAndSync(videoId, startAt, shouldPlay) {
       if (!isPlayerReady) return;
+
+      // بنسجل المزامنة المطلوبة كـ"معلّقة"، وهتتطبق فعليًا في
+      // onPlayerStateChange لما الفيديو يبقى جاهز فعلًا للـseek
+      pendingStartSeconds = startAt;
+      pendingShouldPlay = shouldPlay;
+
       player.loadVideoById({
         videoId: videoId,
         startSeconds: startAt
       });
-      if (!shouldPlay) {
-        setTimeout(function() {
-          player.pauseVideo();
-        }, 300);
-      }
     }
     function flutterGetState() {
       if (!isPlayerReady) return;
