@@ -22,8 +22,9 @@
     var player;
     var isPlayerReady = false;
 
-    // بنخزن هنا أي طلب مزامنة لسه مطبقناهوش، لحد ما الفيديو يبقى جاهز
-    // فعليًا يستقبل أمر seekTo (مش مجرد لحظة استدعاء loadVideoById)
+    // بنخزن هنا طلب المزامنة المعلّق، وهيتطبق بس لما الفيديو يوصل
+    // لحالة CUED (5) - دي أول لحظة مضمونة إن الفيديو جاهز 100% ومحمّل
+    // بالكامل ويقدر يستجيب لأمر seekTo بدقة كاملة
     var pendingStartSeconds = null;
     var pendingShouldPlay = null;
 
@@ -49,21 +50,20 @@
     function onPlayerStateChange(event) {
       sendToFlutter({type: 'stateChange', state: event.data});
 
-      // event.data: 1 = playing, 3 = buffering
-      // دي أول لحظة نضمن فيها إن الفيديو استقبل الـMetadata بتاعه فعليًا
-      // وبقى جاهز يستجيب لأمر seekTo بدقة، فبنطبق المزامنة المعلّقة هنا
-      if (pendingStartSeconds !== null &&
-          (event.data === 1 || event.data === 3)) {
-        player.seekTo(pendingStartSeconds, true);
-
-        if (!pendingShouldPlay) {
-          setTimeout(function() {
-            player.pauseVideo();
-          }, 300);
-        }
+      // event.data === 5 يعني CUED: الفيديو اتحمّل بالكامل وجاهز
+      // يستقبل أمر seekTo دقيق، ودي اللحظة الوحيدة المضمونة للمزامنة
+      if (pendingStartSeconds !== null && event.data === 5) {
+        var startAt = pendingStartSeconds;
+        var shouldPlay = pendingShouldPlay;
 
         pendingStartSeconds = null;
         pendingShouldPlay = null;
+
+        player.seekTo(startAt, true);
+
+        if (shouldPlay) {
+          player.playVideo();
+        }
       }
     }
     function onPlayerError(event) {
@@ -83,12 +83,16 @@
     function flutterLoadAndSync(videoId, startAt, shouldPlay) {
       if (!isPlayerReady) return;
 
-      // بنسجل المزامنة المطلوبة كـ"معلّقة"، وهتتطبق فعليًا في
-      // onPlayerStateChange لما الفيديو يبقى جاهز فعلًا للـseek
+      // بنسجل المزامنة كـ"معلّقة"، وهتتطبق فعليًا في onPlayerStateChange
+      // لما الفيديو يوصل لحالة CUED (مش وقت النداء نفسه)
       pendingStartSeconds = startAt;
       pendingShouldPlay = shouldPlay;
 
-      player.loadVideoById({
+      // cueVideoById بتحمّل الفيديو من غير تشغيل تلقائي فوري، وده اللي
+      // بيضمن حدوث حالة CUED اللي بنستنى عليها فوق. لو استخدمنا
+      // loadVideoById بدل كده، الفيديو بيشتغل فورًا ويتخطى حالة CUED
+      // خالص، فمينفعش نستخدمها هنا
+      player.cueVideoById({
         videoId: videoId,
         startSeconds: startAt
       });
