@@ -94,13 +94,14 @@
       if (isPlayerReady) player.cueVideoById(videoId);
     }
 
-    function flutterLoadAndSync(videoId, startAt, shouldPlay) {
-      if (!isPlayerReady) return;
-      targetVideoId = videoId;
-      pendingStartSeconds = startAt;
-      pendingShouldPlay = shouldPlay;
-      player.loadVideoById({ videoId: videoId, startSeconds: startAt });
-    }
+function flutterLoadAndSync(videoId, startAt, shouldPlay) {
+  if (!isPlayerReady) return;
+  targetVideoId = videoId;
+  pendingStartSeconds = startAt;
+  pendingShouldPlay = shouldPlay;
+  player.mute();
+  player.loadVideoById({ videoId: videoId, startSeconds: startAt });
+}
 
     function flutterGetState() {
       if (!isPlayerReady) return;
