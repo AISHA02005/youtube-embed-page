@@ -12,21 +12,14 @@
   <script src="https://www.youtube.com/iframe_api"></script>
   <script>
     window.onerror = function(message, source, lineno, colno, error) {
-      sendToFlutter({
-        type: 'jsError',
-        message: message,
-        lineno: lineno
-      });
+      sendToFlutter({ type: 'jsError', message: message, lineno: lineno });
     };
 
     var player;
     var isPlayerReady = false;
-
-    // بنخزن هنا طلب المزامنة المعلّق، وهيتطبق بس لما الفيديو يوصل
-    // لحالة CUED (5) - دي أول لحظة مضمونة إن الفيديو جاهز 100% ومحمّل
-    // بالكامل ويقدر يستجيب لأمر seekTo بدقة كاملة
     var pendingStartSeconds = null;
     var pendingShouldPlay = null;
+    var targetVideoId = null;
 
     function onYouTubeIframeAPIReady() {
       player = new YT.Player('player', {
@@ -43,57 +36,82 @@
         }
       });
     }
+
     function onPlayerReady(event) {
       isPlayerReady = true;
       sendToFlutter({type: 'ready'});
     }
-function onPlayerStateChange(event) {
-  sendToFlutter({type: 'stateChange', state: event.data});
-  if (pendingStartSeconds !== null && event.data === 5) {
-    var shouldPlay = pendingShouldPlay;
-    pendingStartSeconds = null;
-    pendingShouldPlay = null;
-    // مفيش داعي لـ seekTo هنا خالص - startSeconds في cueVideoById خلاص
-    // حددت الموضع الصح. نداء seekTo إضافي هنا كان بيلخبط الـ player
-    // ويرجّعه لحالة UNSTARTED
-    if (shouldPlay) {
-      player.playVideo();
+
+    function onPlayerStateChange(event) {
+      sendToFlutter({type: 'stateChange', state: event.data});
+
+      // بنتأكد إن الفيديو اللي بيتشغل دلوقتي هو نفسه الفيديو المطلوب
+      // (مش إعلان)، عن طريق مقارنة الـvideoId الفعلي من الـplayer
+      var currentVideoData = player.getVideoData();
+      var isCorrectVideo = currentVideoData && currentVideoData.video_id === targetVideoId;
+
+      if (pendingStartSeconds !== null && event.data === 5 && isCorrectVideo) {
+        applyPendingSync();
+      }
+
+      // الحالة PLAYING (1) بعد ما الفيديو الصحيح يبدأ فعليًا - دي أول
+      // لحظة موثوقة نقدر نطبق فيها seekTo لو لسه فيه مزامنة معلّقة
+      // (بيحصل لو الإعلان أخّر وصولنا لحالة CUED)
+      if (pendingStartSeconds !== null && event.data === 1 && isCorrectVideo) {
+        applyPendingSync();
+      }
     }
-  }
-}
+
+    function applyPendingSync() {
+      var startAt = pendingStartSeconds;
+      var shouldPlay = pendingShouldPlay;
+      pendingStartSeconds = null;
+      pendingShouldPlay = null;
+
+      player.seekTo(startAt, true);
+      if (shouldPlay) {
+        player.playVideo();
+      } else {
+        player.pauseVideo();
+      }
+    }
+
     function onPlayerError(event) {
       sendToFlutter({type: 'error', code: event.data});
     }
+
     function sendToFlutter(data) {
       if (window.FlutterChannel) {
         window.FlutterChannel.postMessage(JSON.stringify(data));
       }
     }
+
     function flutterPlay() { if (isPlayerReady) player.playVideo(); }
     function flutterPause() { if (isPlayerReady) player.pauseVideo(); }
     function flutterSeekTo(seconds) { if (isPlayerReady) player.seekTo(seconds, true); }
+
     function flutterLoadVideo(videoId) {
       if (isPlayerReady) player.cueVideoById(videoId);
     }
+
     function flutterLoadAndSync(videoId, startAt, shouldPlay) {
       if (!isPlayerReady) return;
-
-      // بنسجل المزامنة كـ"معلّقة"، وهتتطبق فعليًا في onPlayerStateChange
-      // لما الفيديو يوصل لحالة CUED (مش وقت النداء نفسه)
+      targetVideoId = videoId;
       pendingStartSeconds = startAt;
       pendingShouldPlay = shouldPlay;
-
-      // cueVideoById بتحمّل الفيديو من غير تشغيل تلقائي فوري، وده اللي
-      // بيضمن حدوث حالة CUED اللي بنستنى عليها فوق. لو استخدمنا
-      // loadVideoById بدل كده، الفيديو بيشتغل فورًا ويتخطى حالة CUED
-      // خالص، فمينفعش نستخدمها هنا
-      player.cueVideoById({
-        videoId: videoId,
-        startSeconds: startAt
-      });
+      player.loadVideoById({ videoId: videoId, startSeconds: startAt });
     }
+
     function flutterGetState() {
       if (!isPlayerReady) return;
+
+      var currentVideoData = player.getVideoData();
+      var isCorrectVideo = currentVideoData && currentVideoData.video_id === targetVideoId;
+
+      // لو إعلان شغال دلوقتي مش الفيديو الأصلي، منبعتش الموضع الحالي
+      // خالص، عشان منلخبطش الحسابات عند الطرف التاني بوقت الإعلان
+      if (!isCorrectVideo) return;
+
       sendToFlutter({
         type: 'currentState',
         state: player.getPlayerState(),
