@@ -47,25 +47,20 @@
       isPlayerReady = true;
       sendToFlutter({type: 'ready'});
     }
-    function onPlayerStateChange(event) {
-      sendToFlutter({type: 'stateChange', state: event.data});
-
-      // event.data === 5 يعني CUED: الفيديو اتحمّل بالكامل وجاهز
-      // يستقبل أمر seekTo دقيق، ودي اللحظة الوحيدة المضمونة للمزامنة
-      if (pendingStartSeconds !== null && event.data === 5) {
-        var startAt = pendingStartSeconds;
-        var shouldPlay = pendingShouldPlay;
-
-        pendingStartSeconds = null;
-        pendingShouldPlay = null;
-
-        player.seekTo(startAt, true);
-
-        if (shouldPlay) {
-          player.playVideo();
-        }
-      }
+function onPlayerStateChange(event) {
+  sendToFlutter({type: 'stateChange', state: event.data});
+  if (pendingStartSeconds !== null && event.data === 5) {
+    var shouldPlay = pendingShouldPlay;
+    pendingStartSeconds = null;
+    pendingShouldPlay = null;
+    // مفيش داعي لـ seekTo هنا خالص - startSeconds في cueVideoById خلاص
+    // حددت الموضع الصح. نداء seekTo إضافي هنا كان بيلخبط الـ player
+    // ويرجّعه لحالة UNSTARTED
+    if (shouldPlay) {
+      player.playVideo();
     }
+  }
+}
     function onPlayerError(event) {
       sendToFlutter({type: 'error', code: event.data});
     }
