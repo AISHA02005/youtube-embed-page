@@ -62,19 +62,23 @@
       }
     }
 
-    function applyPendingSync() {
-      var startAt = pendingStartSeconds;
-      var shouldPlay = pendingShouldPlay;
-      pendingStartSeconds = null;
-      pendingShouldPlay = null;
+function applyPendingSync() {
+  var startAt = pendingStartSeconds;
+  var shouldPlay = pendingShouldPlay;
+  pendingStartSeconds = null;
+  pendingShouldPlay = null;
 
-      player.seekTo(startAt, true);
-      if (shouldPlay) {
-        player.playVideo();
-      } else {
-        player.pauseVideo();
-      }
-    }
+  player.seekTo(startAt, true);
+  if (shouldPlay) {
+    player.playVideo();
+  } else {
+    player.pauseVideo();
+  }
+
+  setTimeout(function() {
+    player.unMute();
+  }, 300);
+}
 
     function onPlayerError(event) {
       sendToFlutter({type: 'error', code: event.data});
@@ -90,9 +94,12 @@
     function flutterPause() { if (isPlayerReady) player.pauseVideo(); }
     function flutterSeekTo(seconds) { if (isPlayerReady) player.seekTo(seconds, true); }
 
-    function flutterLoadVideo(videoId) {
-      if (isPlayerReady) player.cueVideoById(videoId);
-    }
+function flutterLoadVideo(videoId) {
+  if (isPlayerReady) {
+    player.mute();
+    player.cueVideoById(videoId);
+  }
+}
 
 function flutterLoadAndSync(videoId, startAt, shouldPlay) {
   if (!isPlayerReady) return;
